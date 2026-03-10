@@ -11,6 +11,7 @@
 .svn/
 .swiftpm/
 migrate_working_dir/
+.env
 
 # IntelliJ related
 *.iml
@@ -23,6 +24,10 @@ migrate_working_dir/
 # is commented out by default.
 #.vscode/
 
+# Firebase configs
+android/app/google-services.json
+ios/Runner/GoogleService-Info.plist
+
 # Flutter/Dart/Pub related
 **/doc/api/
 **/ios/Flutter/.last_build_id
@@ -34,7 +39,51 @@ migrate_working_dir/
 /coverage/
 
 # Symbolication related
+app.*.symbols# Miscellaneous
+*.class
+*.log
+*.pyc
+*.swp
+.DS_Store
+.atom/
+.build/
+.buildlog/
+.history
+.svn/
+.swiftpm/
+migrate_working_dir/
+
+# Env file (asegurado)
+.env
+
+# IntelliJ related
+*.iml
+*.ipr
+*.iws
+.idea/
+
+# Flutter/Dart/Pub related
+**/doc/api/
+**/ios/Flutter/.last_build_id
+.dart_tool/
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+/build/
+/coverage/
+
+# Firebase configs (Rutas relativas desde la raíz)
+/android/app/google-services.json
+/ios/Runner/GoogleService-Info.plist
+
+# Symbolication & Obfuscation
 app.*.symbols
+app.*.map.json
+
+# Android Studio artifacts
+/android/app/debug/
+/android/app/profile/
+/android/app/release/
 
 # Obfuscation related
 app.*.map.json
