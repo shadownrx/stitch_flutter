@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "236915535104",
+    "project_id": "educator-78938",
+    "storage_bucket": "educator-78938.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:236915535104:android:29868def4fa3f4232f17e5",
+        "android_client_info": {
+          "package_name": "com.salvador17.Educator"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "236915535104-i0mkmig50m9dlg1pm0t6lejehinde7o2.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB5sq8RG2myMsMyLoTyOIvMxr5qCbTPE-k"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "236915535104-i0mkmig50m9dlg1pm0t6lejehinde7o2.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
