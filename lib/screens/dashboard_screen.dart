@@ -9,6 +9,7 @@ import '../models/teacher.dart';
 import '../models/course.dart';
 import '../models/institution.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter/services.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -23,6 +24,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Teacher? _teacher;
   Institution? _selectedInstitution;
   Course? _selectedCourse;
+  List<Map<String, dynamic>> _riskAlerts = [];
   bool _loading = true;
 
   @override
@@ -59,33 +61,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
           // Load institutions and default courses
           if (teacher != null && teacher.institutionIds.isNotEmpty) {
-            print('Loading institutions for ids: ${teacher.institutionIds}');
             final institution = await _db.getInstitution(
               teacher.institutionIds.first,
             );
             if (mounted) {
-              setState(() {
-                _selectedInstitution = institution;
-              });
+              setState(() => _selectedInstitution = institution);
 
               if (institution != null) {
                 final courses = await _db.getCourses(teacher.id);
-                // Filter courses for the selected institution
                 final filteredCourses = courses
                     .where((c) => c.institutionId == institution.id)
                     .toList();
-                print(
-                  'Found ${filteredCourses.length} courses for institution',
-                );
                 if (filteredCourses.isNotEmpty && mounted) {
-                  setState(() {
-                    _selectedCourse = filteredCourses.first;
-                  });
+                  setState(() => _selectedCourse = filteredCourses.first);
+                  _checkAttendanceRisk(); // Trigger risk check
                 }
               }
             }
-          } else {
-            print('Teacher has no institutionIds linked.');
           }
         }
       } catch (e) {
@@ -93,67 +85,109 @@ class _DashboardScreenState extends State<DashboardScreen> {
         if (mounted) setState(() => _loading = false);
       }
     } else {
-      print('Current user is NULL in _fetchTeacher');
-      if (mounted) {
-        setState(() => _loading = false);
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _checkAttendanceRisk() async {
+    if (_selectedCourse == null) return;
+
+    final students = await _db.streamStudents(_selectedCourse!.id).first;
+    final attendanceRecords = await _db.getAttendanceByDateRange(
+      _selectedCourse!.id,
+      DateTime.now().subtract(const Duration(days: 30)),
+      DateTime.now(),
+    );
+
+    List<Map<String, dynamic>> alerts = [];
+
+    for (var student in students) {
+      int absences = 0;
+      for (var record in attendanceRecords) {
+        final attMap = record['attendance'] as Map<String, dynamic>;
+        if (attMap[student.id] == 'Ausente') {
+          absences++;
+        }
       }
+
+      // Risk threshold: 3+ absences in the last month
+      if (absences >= 3) {
+        alerts.add({
+          'studentName': student.name,
+          'absences': absences,
+          'riskLevel': absences >= 5 ? 'Crítico' : 'Alto',
+        });
+      }
+    }
+
+    if (mounted) {
+      setState(() {
+        _riskAlerts = alerts;
+      });
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    }
-
     final authUser = Provider.of<auth.User?>(context);
-    // Use Firestore name first, then Google account name, then fallback
-    final displayName =
-        (_teacher?.name.isNotEmpty == true && _teacher?.name != 'Docente')
-        ? _teacher!.name
-        : (authUser?.displayName?.isNotEmpty == true
-              ? authUser!.displayName!
-              : 'Docente');
-    final firstName = displayName.split(' ')[0];
 
-    return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      drawer: _buildSidebar(context, displayName, authUser),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children:
-                [
-                      _buildTopBar(displayName, firstName),
-                      _buildInstitutionCard(),
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(24, 8, 24, 4),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              '¡Hola, $firstName!',
-                              style: Theme.of(context).textTheme.displayMedium,
+    return StreamBuilder<Teacher?>(
+      stream: authUser != null ? _db.streamTeacher(authUser.uid) : null,
+      builder: (context, teacherSnapshot) {
+        final teacher = teacherSnapshot.data ?? _teacher;
+
+        // Use Firestore name first, then Google account name, then fallback
+        final displayName =
+            (teacher?.name.isNotEmpty == true && teacher?.name != 'Docente')
+            ? teacher!.name
+            : (authUser?.displayName?.isNotEmpty == true
+                  ? authUser!.displayName!
+                  : 'Docente');
+        final firstName = displayName.split(' ')[0];
+
+        return Scaffold(
+          backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+          drawer: _buildSidebar(context, displayName, authUser, teacher),
+          body: SafeArea(
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children:
+                    [
+                          _buildTopBar(displayName, firstName, teacher),
+                          _buildInstitutionCard(teacher),
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(24, 8, 24, 4),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  '¡Hola, $firstName!',
+                                  style: Theme.of(
+                                    context,
+                                  ).textTheme.displayMedium,
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Gestiona tus clases para hoy.',
+                                  style: Theme.of(context).textTheme.bodyMedium,
+                                ),
+                              ],
                             ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'Gestiona tus clases para hoy.',
-                              style: Theme.of(context).textTheme.bodyMedium,
-                            ),
-                          ],
-                        ),
-                      ),
-                      _buildActionGrid(context),
-                      _buildUpcomingClasses(context, authUser),
-                      const SizedBox(height: 32),
-                    ]
-                    .animate(interval: 50.ms)
-                    .fade(duration: 400.ms)
-                    .slideY(begin: 0.1, end: 0, curve: Curves.easeOutQuad),
+                          ),
+                          _buildAlerts(),
+                          _buildActionGrid(context),
+                          _buildUpcomingClasses(context, authUser, teacher),
+                          const SizedBox(height: 32),
+                        ]
+                        .animate(interval: 50.ms)
+                        .fade(duration: 400.ms)
+                        .slideY(begin: 0.1, end: 0, curve: Curves.easeOutQuad),
+              ),
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
@@ -161,11 +195,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
     BuildContext context,
     String displayName,
     auth.User? authUser,
+    Teacher? teacher,
   ) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final themeService = Provider.of<ThemeService>(context, listen: false);
     final authService = Provider.of<AuthService>(context, listen: false);
-    final photoUrl = _teacher?.photoUrl ?? authUser?.photoURL;
+    final photoUrl = teacher?.photoUrl ?? authUser?.photoURL;
 
     return Drawer(
       child: SafeArea(
@@ -387,9 +422,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildTopBar(String displayName, String firstName) {
+  Widget _buildTopBar(String displayName, String firstName, Teacher? teacher) {
     final authUser = Provider.of<auth.User?>(context);
-    final photoUrl = _teacher?.photoUrl ?? authUser?.photoURL;
+    final photoUrl = teacher?.photoUrl ?? authUser?.photoURL;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
       child: Row(
@@ -442,7 +477,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           // Institución badge
           if (_selectedInstitution != null)
             GestureDetector(
-              onTap: () => _showInstitutionSelector(context),
+              onTap: () => _showInstitutionSelector(context, teacher),
               child: Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 10,
@@ -487,7 +522,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildInstitutionCard() {
+  Widget _buildInstitutionCard(Teacher? teacher) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 24),
       padding: const EdgeInsets.all(24),
@@ -526,7 +561,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
           const SizedBox(height: 12),
           GestureDetector(
-            onTap: () => _showInstitutionSelector(context),
+            onTap: () => _showInstitutionSelector(context, teacher),
             child: Row(
               children: [
                 Expanded(
@@ -589,7 +624,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ),
                   const SizedBox(width: 8),
                   TextButton.icon(
-                    onPressed: () => _showQuickCourseSelector(context),
+                    onPressed: () => _showQuickCourseSelector(context, teacher),
                     icon: const Icon(
                       Icons.swap_horiz,
                       color: Colors.white,
@@ -621,8 +656,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  void _showInstitutionSelector(BuildContext context) {
-    if (_teacher == null) return;
+  void _showInstitutionSelector(BuildContext context, Teacher? teacher) {
+    if (teacher == null) return;
 
     showModalBottomSheet(
       context: context,
@@ -631,7 +666,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ),
       builder: (context) {
         return StreamBuilder<List<Institution>>(
-          stream: _db.streamInstitutions(_teacher!.institutionIds),
+          stream: _db.streamInstitutions(teacher.institutionIds),
           builder: (context, snapshot) {
             if (!snapshot.hasData) return const LinearProgressIndicator();
 
@@ -667,12 +702,40 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 : FontWeight.normal,
                           ),
                         ),
-                        trailing: _selectedInstitution?.id == inst.id
-                            ? const Icon(
+                        subtitle: Text(
+                          'ID: ${inst.id}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppTheme.textSecondary,
+                            fontFamily: 'monospace',
+                          ),
+                        ),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: const Icon(
+                                Icons.copy,
+                                size: 18,
+                                color: AppTheme.primaryBlue,
+                              ),
+                              onPressed: () {
+                                Clipboard.setData(ClipboardData(text: inst.id));
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('ID copiado al portapapeles'),
+                                    duration: Duration(seconds: 2),
+                                  ),
+                                );
+                              },
+                            ),
+                            if (_selectedInstitution?.id == inst.id)
+                              const Icon(
                                 Icons.check_circle,
                                 color: AppTheme.primaryBlue,
-                              )
-                            : null,
+                              ),
+                          ],
+                        ),
                         onTap: () {
                           setState(() {
                             _selectedInstitution = inst;
@@ -701,7 +764,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ),
                     onTap: () {
                       Navigator.pop(context);
-                      _showAddInstitutionDialog(context);
+                      _showAddInstitutionDialog(context, teacher);
                     },
                   ),
                 ],
@@ -713,8 +776,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  void _showQuickCourseSelector(BuildContext context) {
-    if (_teacher == null || _selectedInstitution == null) {
+  void _showQuickCourseSelector(BuildContext context, Teacher? teacher) {
+    if (teacher == null || _selectedInstitution == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Por favor selecciona una institución primero'),
@@ -731,7 +794,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       builder: (context) {
         return StreamBuilder<List<Course>>(
           stream: _db.streamCourses(
-            _teacher!.id,
+            teacher.id,
             institutionId: _selectedInstitution!.id,
           ),
           builder: (context, snapshot) {
@@ -809,7 +872,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           ),
                           onTap: () {
                             Navigator.pop(context);
-                            _showAddCourseDialog(context);
+                            _showAddCourseDialog(context, teacher);
                           },
                         ),
                       ],
@@ -824,7 +887,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  void _showAddInstitutionDialog(BuildContext context) {
+  void _showAddInstitutionDialog(BuildContext context, Teacher? teacher) {
+    if (teacher == null) return;
     final nameController = TextEditingController();
     final addressController = TextEditingController();
     final joinIdController = TextEditingController();
@@ -933,11 +997,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 // Create
                                 if (nameController.text.trim().isEmpty) {
                                   errorMessage = 'El nombre es obligatorio';
-                                } else if (_teacher == null) {
-                                  errorMessage = 'Error: Perfil no cargado';
                                 } else {
                                   final id = await _db.createInstitution(
-                                    _teacher!.id,
+                                    teacher.id,
                                     nameController.text.trim(),
                                     addressController.text.trim().isEmpty
                                         ? null
@@ -950,11 +1012,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 // Join
                                 if (joinIdController.text.trim().isEmpty) {
                                   errorMessage = 'El ID es obligatorio';
-                                } else if (_teacher == null) {
-                                  errorMessage = 'Error: Perfil no cargado';
                                 } else {
                                   final success = await _db.joinInstitution(
-                                    _teacher!.id,
+                                    teacher.id,
                                     joinIdController.text.trim(),
                                   );
                                   if (!success)
@@ -1003,8 +1063,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  void _showAddCourseDialog(BuildContext context) {
-    if (_selectedInstitution == null || _teacher == null) return;
+  void _showAddCourseDialog(BuildContext context, Teacher? teacher) {
+    if (_selectedInstitution == null || teacher == null) return;
 
     final nameController = TextEditingController();
     final roomController = TextEditingController();
@@ -1052,7 +1112,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         setDialogState(() => isProcessing = true);
 
                         final id = await _db.createCourse(
-                          _teacher!.id,
+                          teacher.id,
                           _selectedInstitution!.id,
                           nameController.text.trim(),
                           room: roomController.text.trim().isEmpty
@@ -1104,6 +1164,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
         '/roll_call',
       ),
       _ActionItem(
+        Icons.chat_bubble_outline,
+        'Mis Chats',
+        const Color(0xFFFAF5FF),
+        const Color(0xFF9333EA),
+        '/chat_list',
+      ),
+      _ActionItem(
         Icons.assignment_outlined,
         'Carga de Notas',
         const Color(0xFFFFF7ED),
@@ -1116,13 +1183,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
         const Color(0xFFFAF5FF),
         const Color(0xFF9333EA),
         '/class_plan',
-      ),
-      _ActionItem(
-        Icons.playlist_add_check_circle_outlined,
-        'Actividades',
-        const Color(0xFFECFDF5),
-        AppTheme.successGreen,
-        '/activities',
       ),
     ];
 
@@ -1219,7 +1279,113 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildUpcomingClasses(BuildContext context, auth.User? authUser) {
+  Widget _buildAlerts() {
+    if (_riskAlerts.isEmpty) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.warning_amber_rounded,
+                color: Colors.orange,
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'ALERTAS DE ATENCIÓN',
+                style: TextStyle(
+                  color: Colors.orange.shade800,
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            height: 100,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              itemCount: _riskAlerts.length,
+              itemBuilder: (context, index) {
+                final alert = _riskAlerts[index];
+                final isCritical = alert['riskLevel'] == 'Crítico';
+
+                return Container(
+                  width: 200,
+                  margin: const EdgeInsets.only(right: 12),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: isCritical
+                        ? Colors.red.shade50
+                        : Colors.orange.shade50,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: isCritical
+                          ? Colors.red.withOpacity(0.2)
+                          : Colors.orange.withOpacity(0.2),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      CircleAvatar(
+                        backgroundColor: isCritical
+                            ? Colors.red
+                            : Colors.orange,
+                        radius: 18,
+                        child: const Icon(
+                          Icons.person,
+                          color: Colors.white,
+                          size: 16,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              alert['studentName'],
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            Text(
+                              '${alert['absences']} faltas (${alert['riskLevel']})',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: isCritical
+                                    ? Colors.red.shade900
+                                    : Colors.orange.shade900,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildUpcomingClasses(
+    BuildContext context,
+    auth.User? authUser,
+    Teacher? teacher,
+  ) {
     if (_loading) return const SizedBox.shrink();
 
     return Padding(
@@ -1233,7 +1399,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               Text('Mis Cursos', style: Theme.of(context).textTheme.titleLarge),
               if (_selectedInstitution != null)
                 TextButton.icon(
-                  onPressed: () => _showAddCourseDialog(context),
+                  onPressed: () => _showAddCourseDialog(context, teacher),
                   icon: const Icon(Icons.add, size: 18),
                   label: const Text('Añadir'),
                   style: TextButton.styleFrom(
@@ -1246,7 +1412,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           const SizedBox(height: 16),
           StreamBuilder<List<Course>>(
             stream: _db.streamCourses(
-              _teacher?.id ?? authUser?.uid ?? '',
+              teacher?.id ?? authUser?.uid ?? '',
               institutionId: _selectedInstitution?.id,
             ),
             builder: (context, snapshot) {

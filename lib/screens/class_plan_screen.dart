@@ -5,6 +5,7 @@ import '../models/class_plan.dart';
 import '../services/database_service.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:intl/intl.dart';
 
 class ClassPlanScreen extends StatefulWidget {
   final Course course;
@@ -21,7 +22,8 @@ class _ClassPlanScreenState extends State<ClassPlanScreen> {
     try {
       final String message =
           'Plan de Clase: ${plan.title}\nMateria: ${plan.subject}\n'
-          'Fecha: ${plan.date.day}/${plan.date.month}/${plan.date.year}\n\n'
+          'Fecha: ${plan.date.day}/${plan.date.month}/${plan.date.year}\n'
+          'Estado: ${plan.status}\n\n'
           'Descripción: ${plan.description}'
           '${plan.objectives.isNotEmpty ? '\n\nObjetivos:\n${plan.objectives.map((o) => '• $o').join('\n')}' : ''}';
 
@@ -73,7 +75,6 @@ class _ClassPlanScreenState extends State<ClassPlanScreen> {
             ),
             child: Column(
               children: [
-                // Handle
                 Container(
                   margin: const EdgeInsets.only(top: 12),
                   width: 40,
@@ -83,7 +84,6 @@ class _ClassPlanScreenState extends State<ClassPlanScreen> {
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
-                // Header
                 Padding(
                   padding: const EdgeInsets.fromLTRB(24, 16, 16, 0),
                   child: Row(
@@ -108,7 +108,6 @@ class _ClassPlanScreenState extends State<ClassPlanScreen> {
                   ),
                 ),
                 const Divider(height: 24),
-                // Form
                 Expanded(
                   child: SingleChildScrollView(
                     controller: scrollController,
@@ -181,7 +180,6 @@ class _ClassPlanScreenState extends State<ClassPlanScreen> {
                         ),
                         const SizedBox(height: 24),
                         _FormLabel('Objetivos de Aprendizaje'),
-                        // Add objective input
                         Row(
                           children: [
                             Expanded(
@@ -225,7 +223,6 @@ class _ClassPlanScreenState extends State<ClassPlanScreen> {
                           ],
                         ),
                         const SizedBox(height: 12),
-                        // Objectives list
                         if (objectives.isNotEmpty)
                           ...objectives.asMap().entries.map(
                             (entry) => Container(
@@ -266,7 +263,6 @@ class _ClassPlanScreenState extends State<ClassPlanScreen> {
                             ),
                           ),
                         const SizedBox(height: 32),
-                        // Save button
                         ElevatedButton.icon(
                           onPressed: isProcessing
                               ? null
@@ -339,6 +335,32 @@ class _ClassPlanScreenState extends State<ClassPlanScreen> {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  void _showDeleteConfirmation(BuildContext context, ClassPlan plan) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Eliminar Plan'),
+        content: Text('¿Estás seguro de que quieres eliminar "${plan.title}"?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () {
+              _db.deleteClassPlan(widget.course.id, plan.id);
+              Navigator.pop(ctx);
+            },
+            child: const Text(
+              'Eliminar',
+              style: TextStyle(color: Colors.redAccent),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -438,6 +460,17 @@ class _ClassPlanScreenState extends State<ClassPlanScreen> {
                     isDark: isDark,
                     onShare: () => _sharePlan(context, plan),
                     onTap: () => _showPlanDetail(context, plan),
+                    onToggleStatus: () {
+                      final newStatus = plan.status == 'PENDIENTE'
+                          ? 'COMPLETADO'
+                          : 'PENDIENTE';
+                      _db.updateClassPlanStatus(
+                        widget.course.id,
+                        plan.id,
+                        newStatus,
+                      );
+                    },
+                    onDelete: () => _showDeleteConfirmation(context, plan),
                   )
                   .animate()
                   .fade(delay: (100 * index).ms)
@@ -507,12 +540,39 @@ class _ClassPlanScreenState extends State<ClassPlanScreen> {
                         ],
                       ),
                       const SizedBox(height: 4),
-                      Text(
-                        '${plan.subject} • ${plan.date.day}/${plan.date.month}/${plan.date.year}',
-                        style: const TextStyle(
-                          color: AppTheme.primaryBlue,
-                          fontWeight: FontWeight.w600,
-                        ),
+                      Row(
+                        children: [
+                          Text(
+                            '${plan.subject} • ${plan.date.day}/${plan.date.month}/${plan.date.year}',
+                            style: const TextStyle(
+                              color: AppTheme.primaryBlue,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const Spacer(),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: plan.status == 'COMPLETADO'
+                                  ? Colors.green.shade50
+                                  : Colors.orange.shade50,
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Text(
+                              plan.status,
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                color: plan.status == 'COMPLETADO'
+                                    ? Colors.green
+                                    : Colors.orange,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 20),
                       if (plan.description.isNotEmpty) ...[
@@ -596,16 +656,22 @@ class _PlanCard extends StatelessWidget {
   final bool isDark;
   final VoidCallback onShare;
   final VoidCallback onTap;
+  final VoidCallback onToggleStatus;
+  final VoidCallback onDelete;
 
   const _PlanCard({
     required this.plan,
     required this.isDark,
     required this.onShare,
     required this.onTap,
+    required this.onToggleStatus,
+    required this.onDelete,
   });
 
   @override
   Widget build(BuildContext context) {
+    final isCompleted = plan.status == 'COMPLETADO';
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -633,12 +699,14 @@ class _PlanCard extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: AppTheme.accentBlue,
+                    color: isCompleted
+                        ? Colors.green.shade50
+                        : AppTheme.accentBlue,
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: const Icon(
-                    Icons.menu_book_outlined,
-                    color: AppTheme.primaryBlue,
+                  child: Icon(
+                    isCompleted ? Icons.check_circle : Icons.menu_book_outlined,
+                    color: isCompleted ? Colors.green : AppTheme.primaryBlue,
                     size: 22,
                   ),
                 ),
@@ -649,9 +717,13 @@ class _PlanCard extends StatelessWidget {
                     children: [
                       Text(
                         plan.title,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 16,
+                          decoration: isCompleted
+                              ? TextDecoration.lineThrough
+                              : null,
+                          color: isCompleted ? AppTheme.textSecondary : null,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -667,11 +739,61 @@ class _PlanCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                IconButton(
-                  onPressed: onShare,
-                  icon: const Icon(Icons.share_outlined, size: 20),
-                  color: AppTheme.textSecondary,
-                  tooltip: 'Compartir por WhatsApp',
+                PopupMenuButton<String>(
+                  onSelected: (val) {
+                    if (val == 'status') onToggleStatus();
+                    if (val == 'share') onShare();
+                    if (val == 'delete') onDelete();
+                  },
+                  itemBuilder: (ctx) => [
+                    PopupMenuItem(
+                      value: 'status',
+                      child: Row(
+                        children: [
+                          Icon(
+                            isCompleted
+                                ? Icons.pending_actions
+                                : Icons.check_circle_outline,
+                            size: 18,
+                          ),
+                          const SizedBox(width: 10),
+                          Text(
+                            isCompleted
+                                ? 'Marcar como Pendiente'
+                                : 'Marcar como Completado',
+                          ),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'share',
+                      child: Row(
+                        children: [
+                          Icon(Icons.share_outlined, size: 18),
+                          const SizedBox(width: 10),
+                          Text('Compartir por WhatsApp'),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'delete',
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.delete_outline,
+                            size: 18,
+                            color: Colors.redAccent,
+                          ),
+                          const SizedBox(width: 10),
+                          Text(
+                            'Eliminar',
+                            style: TextStyle(color: Colors.redAccent),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                  child: Icon(Icons.more_vert, color: Colors.grey.shade400),
                 ),
               ],
             ),
@@ -720,6 +842,27 @@ class _PlanCard extends StatelessWidget {
                     ),
                   ),
                 ],
+                const Spacer(),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: isCompleted
+                        ? Colors.green.shade50
+                        : Colors.orange.shade50,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    plan.status,
+                    style: TextStyle(
+                      fontSize: 9,
+                      fontWeight: FontWeight.bold,
+                      color: isCompleted ? Colors.green : Colors.orange,
+                    ),
+                  ),
+                ),
               ],
             ),
           ],

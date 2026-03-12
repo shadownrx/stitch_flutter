@@ -13,7 +13,11 @@ import 'screens/activities_screen.dart';
 import 'screens/main_navigation_wrapper.dart';
 import 'screens/settings_screen.dart';
 import 'screens/student_list_screen.dart';
+import 'screens/chat_list_screen.dart';
+import 'screens/chat_detail_screen.dart';
+import 'screens/teacher_selection_screen.dart';
 import 'services/theme_service.dart';
+import 'services/chat_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -42,6 +46,7 @@ class StitchApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         Provider<AuthService>(create: (_) => AuthService()),
+        Provider<ChatService>(create: (_) => ChatService()),
         StreamProvider<auth.User?>(
           create: (context) => context.read<AuthService>().user,
           initialData: null,
@@ -87,6 +92,28 @@ class StitchApp extends StatelessWidget {
           if (settings.name == '/student_list') {
             return MaterialPageRoute(
               builder: (context) => const StudentListScreen(),
+            );
+          }
+          if (settings.name == '/chat_list') {
+            return MaterialPageRoute(
+              builder: (context) => const ChatListScreen(),
+            );
+          }
+          if (settings.name == '/teacher_selection') {
+            final institutionId = settings.arguments as String;
+            return MaterialPageRoute(
+              builder: (context) =>
+                  TeacherSelectionScreen(institutionId: institutionId),
+            );
+          }
+          if (settings.name == '/chat_detail') {
+            final args = settings.arguments as Map<String, dynamic>;
+            return MaterialPageRoute(
+              builder: (context) => ChatDetailScreen(
+                roomId: args['roomId'],
+                otherTeacherName: args['otherTeacherName'],
+                otherTeacherId: args['otherTeacherId'],
+              ),
             );
           }
           return null;

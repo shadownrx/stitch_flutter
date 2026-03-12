@@ -5,9 +5,22 @@ import '../models/student.dart';
 import '../models/activity.dart';
 import '../models/class_plan.dart';
 import '../models/institution.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'dart:io';
 
 class DatabaseService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
+  final FirebaseStorage _storage = FirebaseStorage.instance;
+
+  // Stream Teacher Data
+  Stream<Teacher?> streamTeacher(String uid) {
+    return _db.collection('teachers').doc(uid).snapshots().map((doc) {
+      if (doc.exists) {
+        return Teacher.fromMap(doc.data() as Map<String, dynamic>, doc.id);
+      }
+      return null;
+    });
+  }
 
   // Get Teacher Data
   Future<Teacher?> getTeacher(String uid) async {
@@ -31,6 +44,7 @@ class DatabaseService {
     String? photoUrl,
   }) async {
     try {
+      print('Creating teacher profile for UID: $uid');
       final docRef = _db.collection('teachers').doc(uid);
       final data = {
         'name': name,
@@ -41,6 +55,7 @@ class DatabaseService {
       };
 
       await docRef.set(data, SetOptions(merge: true));
+      print('Teacher profile set in Firestore');
       final doc = await docRef.get();
       return Teacher.fromMap(doc.data() as Map<String, dynamic>, doc.id);
     } catch (e) {
@@ -84,17 +99,20 @@ class DatabaseService {
     String? address,
   ) async {
     try {
+      print('Creating institution: $name for teacher: $teacherId');
       // 1. Create the institution
       DocumentReference instRef = await _db.collection('institutions').add({
         'name': name,
         'address': address,
         'createdAt': FieldValue.serverTimestamp(),
       });
+      print('Institution created with ID: ${instRef.id}');
 
       // 2. Link to teacher
       await _db.collection('teachers').doc(teacherId).update({
         'institutionIds': FieldValue.arrayUnion([instRef.id]),
       });
+      print('Institution linked to teacher successfully');
 
       return instRef.id;
     } catch (e) {
@@ -122,6 +140,39 @@ class DatabaseService {
     } catch (e) {
       print('Error joining institution: $e');
       return false;
+    }
+  }
+
+  // Find institution by join code
+  Future<String?> findInstitutionByCode(String code) async {
+    try {
+      final snapshot = await _db
+          .collection('institutions')
+          .where('joinCode', isEqualTo: code)
+          .limit(1)
+          .get();
+      if (snapshot.docs.isNotEmpty) {
+        return snapshot.docs.first.id;
+      }
+      return null;
+    } catch (e) {
+      print('Error finding institution by code: $e');
+      return null;
+    }
+  }
+
+  // Link teacher to institution
+  Future<void> linkTeacherToInstitution(
+    String teacherId,
+    String institutionId,
+  ) async {
+    try {
+      await _db.collection('teachers').doc(teacherId).update({
+        'institutionIds': FieldValue.arrayUnion([institutionId]),
+      });
+    } catch (e) {
+      print('Error linking teacher to institution: $e');
+      throw e;
     }
   }
 
@@ -330,12 +381,45 @@ class DatabaseService {
             'objectives': objectives,
             'resources': resources,
             'imageUrl': imageUrl,
+            'status': 'PENDIENTE',
             'createdAt': FieldValue.serverTimestamp(),
           });
       return docRef.id;
     } catch (e) {
       print('Error creating class plan: $e');
       return null;
+    }
+  }
+
+  // Update class plan status
+  Future<void> updateClassPlanStatus(
+    String courseId,
+    String planId,
+    String status,
+  ) async {
+    try {
+      await _db
+          .collection('courses')
+          .doc(courseId)
+          .collection('class_plans')
+          .doc(planId)
+          .update({'status': status});
+    } catch (e) {
+      print('Error updating class plan status: $e');
+    }
+  }
+
+  // Delete a class plan
+  Future<void> deleteClassPlan(String courseId, String planId) async {
+    try {
+      await _db
+          .collection('courses')
+          .doc(courseId)
+          .collection('class_plans')
+          .doc(planId)
+          .delete();
+    } catch (e) {
+      print('Error deleting class plan: $e');
     }
   }
 
@@ -436,6 +520,40 @@ class DatabaseService {
     } catch (e) {
       print('Error getting all grades: $e');
       return {};
+    }
+  }
+
+  // Update Teacher Profile
+  Future<bool> updateTeacherProfile(
+    String uid, {
+    String? name,
+    String? photoUrl,
+  }) async {
+    try {
+      final Map<String, dynamic> data = {};
+      if (name != null) data['name'] = name;
+      if (photoUrl != null) data['photoUrl'] = photoUrl;
+
+      if (data.isEmpty) return true;
+
+      await _db.collection('teachers').doc(uid).update(data);
+      return true;
+    } catch (e) {
+      print('Error updating teacher profile: $e');
+      return false;
+    }
+  }
+
+  // Upload Profile Image to Firebase Storage
+  Future<String?> uploadProfileImage(String uid, File image) async {
+    try {
+      final ref = _storage.ref().child('teacher_profiles').child('$uid.jpg');
+      await ref.putFile(image);
+      final url = await ref.getDownloadURL();
+      return url;
+    } catch (e) {
+      print('Error uploading profile image: $e');
+      return null;
     }
   }
 }

@@ -3,12 +3,14 @@ class Institution {
   final String name;
   final String? address;
   final String? logoUrl;
+  final String? joinCode;
 
   Institution({
     required this.id,
     required this.name,
     this.address,
     this.logoUrl,
+    this.joinCode,
   });
 
   factory Institution.fromMap(Map<String, dynamic> data, String documentId) {
@@ -17,6 +19,7 @@ class Institution {
       name: data['name'] ?? '',
       address: data['address'],
       logoUrl: data['logoUrl'],
+      joinCode: data['joinCode'],
     );
   }
 
@@ -25,6 +28,7 @@ class Institution {
       'name': name,
       'address': address,
       'logoUrl': logoUrl,
+      'joinCode': joinCode,
     };
   }
 }

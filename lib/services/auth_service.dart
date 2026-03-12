@@ -52,6 +52,23 @@ class AuthService {
     }
   }
 
+  // Sign up with email and password
+  Future<User?> signUpWithEmailAndPassword(
+    String email,
+    String password,
+  ) async {
+    try {
+      UserCredential result = await _auth.createUserWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+      return result.user;
+    } catch (e) {
+      print('Error signing up: ${e.toString()}');
+      rethrow; // Rethrow to allow UI to handle specific error
+    }
+  }
+
   // Sign out
   Future<void> signOut() async {
     try {

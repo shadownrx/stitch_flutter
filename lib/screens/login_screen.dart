@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
-import '../theme/app_theme.dart';
 import '../services/auth_service.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'register_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -21,15 +21,15 @@ class _LoginScreenState extends State<LoginScreen>
   bool _isLoading = false;
 
   // ── Palette ──────────────────────────────────────────────────────────────
-  static const Color _emerald     = Color(0xFF0E9E6E);
+  static const Color _emerald = Color(0xFF0E9E6E);
   static const Color _emeraldDark = Color(0xFF077A53);
   static const Color _emeraldSoft = Color(0xFFE8F7F2);
-  static const Color _ink         = Color(0xFF0F1C2E);
-  static const Color _inkMid      = Color(0xFF3D5068);
-  static const Color _slate       = Color(0xFF8A9AB0);
-  static const Color _line        = Color(0xFFE4EAF0);
-  static const Color _surface     = Color(0xFFF7F9FC);
-  static const Color _white       = Color(0xFFFFFFFF);
+  static const Color _ink = Color(0xFF0F1C2E);
+  static const Color _inkMid = Color(0xFF3D5068);
+  static const Color _slate = Color(0xFF8A9AB0);
+  static const Color _line = Color(0xFFE4EAF0);
+  static const Color _surface = Color(0xFFF7F9FC);
+  static const Color _white = Color(0xFFFFFFFF);
 
   late AnimationController _shimmerCtrl;
 
@@ -69,33 +69,49 @@ class _LoginScreenState extends State<LoginScreen>
                     _buildHeader()
                         .animate()
                         .fadeIn(duration: 500.ms)
-                        .slideY(begin: -0.1, end: 0, curve: Curves.easeOutCubic),
+                        .slideY(
+                          begin: -0.1,
+                          end: 0,
+                          curve: Curves.easeOutCubic,
+                        ),
                     const SizedBox(height: 40),
                     _buildGoogleButton()
                         .animate()
                         .fadeIn(duration: 500.ms, delay: 150.ms)
-                        .slideY(begin: 0.08, end: 0, curve: Curves.easeOutCubic),
+                        .slideY(
+                          begin: 0.08,
+                          end: 0,
+                          curve: Curves.easeOutCubic,
+                        ),
                     const SizedBox(height: 24),
-                    _buildDivider()
-                        .animate()
-                        .fadeIn(duration: 400.ms, delay: 250.ms),
+                    _buildDivider().animate().fadeIn(
+                      duration: 400.ms,
+                      delay: 250.ms,
+                    ),
                     const SizedBox(height: 24),
                     _buildFormFields()
                         .animate()
                         .fadeIn(duration: 500.ms, delay: 320.ms)
-                        .slideY(begin: 0.08, end: 0, curve: Curves.easeOutCubic),
+                        .slideY(
+                          begin: 0.08,
+                          end: 0,
+                          curve: Curves.easeOutCubic,
+                        ),
                     const SizedBox(height: 32),
-                    _buildLoginButton()
-                        .animate()
-                        .fadeIn(duration: 500.ms, delay: 420.ms),
+                    _buildLoginButton().animate().fadeIn(
+                      duration: 500.ms,
+                      delay: 420.ms,
+                    ),
                     const SizedBox(height: 28),
-                    _buildRegisterRow()
-                        .animate()
-                        .fadeIn(duration: 400.ms, delay: 500.ms),
+                    _buildRegisterRow().animate().fadeIn(
+                      duration: 400.ms,
+                      delay: 500.ms,
+                    ),
                     const SizedBox(height: 52),
-                    _buildFooter()
-                        .animate()
-                        .fadeIn(duration: 400.ms, delay: 600.ms),
+                    _buildFooter().animate().fadeIn(
+                      duration: 400.ms,
+                      delay: 600.ms,
+                    ),
                     const SizedBox(height: 36),
                   ],
                 ),
@@ -144,10 +160,7 @@ class _LoginScreenState extends State<LoginScreen>
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 gradient: RadialGradient(
-                  colors: [
-                    _emeraldSoft.withOpacity(0.7),
-                    Colors.transparent,
-                  ],
+                  colors: [_emeraldSoft.withOpacity(0.7), Colors.transparent],
                 ),
               ),
             ),
@@ -185,8 +198,11 @@ class _LoginScreenState extends State<LoginScreen>
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.auto_stories_rounded,
-                  color: Colors.white, size: 18),
+              const Icon(
+                Icons.auto_stories_rounded,
+                color: Colors.white,
+                size: 18,
+              ),
               const SizedBox(width: 8),
               Text(
                 'ESCOLARIS',
@@ -230,8 +246,10 @@ class _LoginScreenState extends State<LoginScreen>
           ? null
           : () async {
               setState(() => _isLoading = true);
-              final authService =
-                  Provider.of<AuthService>(context, listen: false);
+              final authService = Provider.of<AuthService>(
+                context,
+                listen: false,
+              );
               final user = await authService.signInWithGoogle();
               setState(() => _isLoading = false);
               if (user != null) {
@@ -253,9 +271,7 @@ class _LoginScreenState extends State<LoginScreen>
         minimumSize: const Size(double.infinity, 54),
         backgroundColor: _white,
         side: BorderSide(color: _line, width: 1.5),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         elevation: 0,
       ),
     );
@@ -335,8 +351,11 @@ class _LoginScreenState extends State<LoginScreen>
             decoration: InputDecoration(
               hintText: '••••••••',
               hintStyle: GoogleFonts.dmSans(color: _slate, fontSize: 15),
-              prefixIcon:
-                  Icon(Icons.lock_outline_rounded, color: _slate, size: 20),
+              prefixIcon: Icon(
+                Icons.lock_outline_rounded,
+                color: _slate,
+                size: 20,
+              ),
               suffixIcon: GestureDetector(
                 onTap: () =>
                     setState(() => _obscurePassword = !_obscurePassword),
@@ -349,8 +368,10 @@ class _LoginScreenState extends State<LoginScreen>
                 ),
               ),
               border: InputBorder.none,
-              contentPadding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 16,
+              ),
             ),
           ),
         ),
@@ -379,13 +400,16 @@ class _LoginScreenState extends State<LoginScreen>
                           BoxShadow(
                             color: _emerald.withOpacity(0.25),
                             blurRadius: 8,
-                          )
+                          ),
                         ]
                       : null,
                 ),
                 child: _rememberMe
-                    ? const Icon(Icons.check_rounded,
-                        size: 14, color: Colors.white)
+                    ? const Icon(
+                        Icons.check_rounded,
+                        size: 14,
+                        color: Colors.white,
+                      )
                     : null,
               ),
               const SizedBox(width: 10),
@@ -433,8 +457,10 @@ class _LoginScreenState extends State<LoginScreen>
           hintStyle: GoogleFonts.dmSans(color: _slate, fontSize: 15),
           prefixIcon: Icon(icon, color: _slate, size: 20),
           border: InputBorder.none,
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 16,
+          ),
         ),
       ),
     );
@@ -456,8 +482,10 @@ class _LoginScreenState extends State<LoginScreen>
           ? null
           : () async {
               setState(() => _isLoading = true);
-              final authService =
-                  Provider.of<AuthService>(context, listen: false);
+              final authService = Provider.of<AuthService>(
+                context,
+                listen: false,
+              );
               final user = await authService.signInWithEmailAndPassword(
                 _emailController.text.trim(),
                 _passwordController.text,
@@ -475,7 +503,8 @@ class _LoginScreenState extends State<LoginScreen>
                     backgroundColor: const Color(0xFFD94040),
                     behavior: SnackBarBehavior.floating,
                     shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
                 );
               }
@@ -526,8 +555,11 @@ class _LoginScreenState extends State<LoginScreen>
                       ),
                     ),
                     const SizedBox(width: 8),
-                    const Icon(Icons.arrow_forward_rounded,
-                        color: Colors.white, size: 18),
+                    const Icon(
+                      Icons.arrow_forward_rounded,
+                      color: Colors.white,
+                      size: 18,
+                    ),
                   ],
                 ),
         ),
@@ -547,7 +579,12 @@ class _LoginScreenState extends State<LoginScreen>
             style: GoogleFonts.dmSans(fontSize: 14, color: _slate),
           ),
           GestureDetector(
-            onTap: () {},
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const RegisterScreen()),
+              );
+            },
             child: Text(
               'Regístrate ahora',
               style: GoogleFonts.dmSans(
@@ -577,11 +614,12 @@ class _LoginScreenState extends State<LoginScreen>
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
-              _buildBadge(
-                  Icons.verified_user_outlined, 'SEGURIDAD\nEDUCATIVA'),
+              _buildBadge(Icons.verified_user_outlined, 'SEGURIDAD\nEDUCATIVA'),
               Container(width: 1, height: 36, color: _line),
               _buildBadge(
-                  Icons.support_agent_outlined, 'SOPORTE\nTÉCNICO 24/7'),
+                Icons.support_agent_outlined,
+                'SOPORTE\nTÉCNICO 24/7',
+              ),
             ],
           ),
         ),
@@ -634,6 +672,5 @@ class _DotGridPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _DotGridPainter old) =>
-      old.dotColor != dotColor;
+  bool shouldRepaint(covariant _DotGridPainter old) => old.dotColor != dotColor;
 }
